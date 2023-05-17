@@ -14,6 +14,11 @@ public class Compress {
     private static HashMap<String, Character> codeToChar;
 
     public static void main(String[] args) throws IOException {
+        if(args.length != 2){
+            System.out.println("Use java Compress sourceFile.txt compressedFile.txt to run");
+            System.exit(1);
+        }
+
         String sourceFile = args[0];
         String compressedFile = args[1];
 
