@@ -5,6 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.util.Scanner;
 
 public class decompressFile {
     public static void main(String[] args) throws FileNotFoundException, IOException, ClassNotFoundException {
@@ -20,9 +21,9 @@ public class decompressFile {
         }
 
         FileInputStream input = new FileInputStream(args[0]);
-        ObjectInputStream objectInput = new ObjectInputStream(input);
-        String[] codes = (String[])(objectInput.readObject());
-        int sizeOfData = objectInput.readInt();
+        Scanner objectInput = new Scanner(input);
+        String[] codes = (String[])(objectInput.nextLine());
+        int sizeOfData = objectInput.nextInt();
 
         int r = 0;
         StringBuilder text = new StringBuilder("");
