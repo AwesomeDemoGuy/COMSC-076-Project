@@ -1,3 +1,4 @@
+
 import java.io.*;
 import java.util.ArrayList;
 public class compressFile {
@@ -36,6 +37,7 @@ public class compressFile {
         BitOutputStream outputStream = new BitOutputStream(new File(args[1]));
         outputStream.writeBit(result.toString());
         outputStream.close();
+
     }
     //From Assignment 2
     public static class BitOutputStream {
@@ -168,7 +170,7 @@ public class compressFile {
                 this.element = element;
             }
         }
-}
+    }
     
     static class Heap<E extends Comparable<E>> {
 

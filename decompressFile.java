@@ -15,7 +15,7 @@ public class decompressFile {
 
         File sourceFile = new File(args[0]);
         if(!sourceFile.exists()){
-            System.out.println("File error");
+            System.out.println("Could not find compressed file");
             System.exit(2);
         }
 
