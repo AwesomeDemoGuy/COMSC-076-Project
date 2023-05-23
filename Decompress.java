@@ -6,6 +6,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
+/*
+ * May 23, 2023
+ * Part 2
+ * This program intends to decompress a previously compressed text file and replicate
+ * the contents from the original source file into a few file.
+ */
 
 public class Decompress {
     public static void main(String[] args) throws IOException, ClassNotFoundException {
