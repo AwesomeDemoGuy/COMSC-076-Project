@@ -9,9 +9,6 @@ import java.util.*;
 
 public class Compress {
     // using priority queue to implement a min heap
-    private static PriorityQueue<Node> queue;
-    private static HashMap<Character, String> charToCode;
-    private static HashMap<String, Character> codeToChar;
 
     public static void main(String[] args) throws IOException {
         if(args.length != 2){
@@ -19,99 +16,206 @@ public class Compress {
             System.exit(1);
         }
 
-        String sourceFile = args[0];
-        String compressedFile = args[1];
+        File sourceFile = new File(args[0]);
+        File compressedFile = new File(args[1]);
 
         compressFile(sourceFile, compressedFile);
     }
 
-    private static void compressFile(String sourceFile, String compressedFile) throws IOException {
-        HashMap<Character, Integer> charCounts = new HashMap<>();
-        File file = new File(sourceFile);
-        Scanner scanner = new Scanner(file);
-    
-        //counting character frequencies in source
-        while (scanner.hasNext()) {
-            char[] chars = scanner.nextLine().toCharArray();
-            for (char c : chars) {
-                charCounts.put(c, charCounts.getOrDefault(c, 0) + 1);
-            }
+    private static void compressFile(File sourceFile, File compressedFile) throws IOException {
+        Scanner scanner = new Scanner(sourceFile);
+        StringBuilder stringBuilder = new StringBuilder();
+       
+        while (scanner.hasNextLine()) {
+            stringBuilder.append(scanner.nextLine());
+            stringBuilder.append("\n");
         }
         scanner.close();
-    
-        //creating Huffman tree
-        createTree(charCounts);
-    
-        //initializing charToCode and codeToChar
-        charToCode = new HashMap<>();
-        codeToChar = new HashMap<>();
-    
-        //creating dictionaries to lookup char or code
-        createDictionaries(queue.peek(), "");
-    
-        //writing compressed file
+
+        String text = stringBuilder.toString();
+        
+        int[] charCounts = new int[256];
+        for (int i = 0; i < text.length(); i++) {
+            charCounts[(int) text.charAt(i)]++;
+        }
+
+        Tree tree = createTree(charCounts);
+        String[] codes = getCode(tree.root);
+
         ObjectOutputStream objectOutputStream = new ObjectOutputStream(new FileOutputStream(compressedFile));
-        objectOutputStream.writeObject(charToCode);
-        BitOutputStream bitOutputStream = new BitOutputStream(new File(compressedFile));
-        scanner = new Scanner(file);
-        while (scanner.hasNext()) {
-            char[] chars = scanner.nextLine().toCharArray();
-            for (char c : chars) {
-                bitOutputStream.writeBit(charToCode.get(c));
-            }
-        }
-        scanner.close();
-        bitOutputStream.close();
+        objectOutputStream.writeObject(tree);
         objectOutputStream.close();
+
+        StringBuilder codesBuilder = new StringBuilder();
+        for (char c : text.toCharArray()) {
+            String code = codes[c];
+            codesBuilder.append(code);
+        }
+
+        BitOutputStream bitOutputStream = new BitOutputStream(compressedFile, true);
+        bitOutputStream.writeBit(codesBuilder.toString());
+        bitOutputStream.close();
     }    
 
-    private static void createTree(HashMap<Character, Integer> charCounts) {
-        queue = new PriorityQueue<>(Comparator.comparingInt(node -> node.freq));
-        for (Map.Entry<Character, Integer> entry : charCounts.entrySet()) {
-            queue.add(new Node(entry.getKey(), entry.getValue()));
+    public static String[] getCode(Tree.Node root) {
+        if (root == null) {
+            return null;
         }
+        String[] codes = new String[2 * 128];
+        assignCode(root, codes);
+        return codes;
+    }
 
-        while (queue.size() > 1) {
-            Node x = queue.poll();
-            Node y = queue.poll();
-            Node sum = new Node('-', x.freq + y.freq);
-            sum.left = x;
-            sum.right = y;
-            queue.add(sum);
+    private static void assignCode(Tree.Node root, String[] codes) {
+        if (root.left != null) {
+            root.left.code = root.code + "0";
+            assignCode(root.left, codes);
+
+            root.right.code = root.code + "1";
+            assignCode(root.right, codes);
+        } else {
+            codes[(int) root.element] = root.code;
         }
     }
 
-    private static void createDictionaries(Node node, String s) {
-        if (node == null) return;
-        if (node.left == null && node.right == null) {
-            charToCode.put(node.c, s);
-            codeToChar.put(s, node.c);
-        }
-        // traverse left
-        createDictionaries(node.left, s + '0');
-        // traverse right
-        createDictionaries(node.right, s + '1');
+    private static Tree createTree(int[] counts) {
+
+        Heap<Tree> heap = new Heap<>(); 
+        for (int i = 0; i < counts.length; i++) {
+			if (counts[i] > 0)
+				heap.add(new Tree(counts[i], (char) i)); // A leaf node tree
+		}
+
+		while (heap.getSize() > 1) {
+			Tree t1 = heap.remove(); // Remove the smallest weight tree
+			Tree t2 = heap.remove(); // Remove the next smallest weight
+			heap.add(new Tree(t1, t2)); // Combine two trees
+		}
+
+		return heap.remove(); // The final tree
     }
 
-    static class Node {
-        public char c;
-        public int freq;
-        public Node left = null, right = null;
+    public static class Tree implements Comparable<Tree>, Serializable{
+        Node root;
 
-        Node(char c, int freq) {
-            this.c = c;
-            this.freq = freq;
+        public Tree(Tree t1, Tree t2) {
+            root = new Node();
+            root.left = t1.root;
+            root.right = t2.root;
+            root.weight = t1.root.weight + t2.root.weight;
+        }
+
+        public Tree(int weight, char element) {
+            root = new Node(weight, element);
+        }
+
+        public int compareTo(Tree t) {
+            if (root.weight < t.root.weight){
+                return 1;
+            } 
+            else if (root.weight == t.root.weight){
+                return 0;
+            }
+            else{
+                return -1;
+            }
+        }
+
+        public class Node implements Serializable {
+            char element; 
+            int weight; 
+            Node left; 
+            Node right; 
+            String code = ""; 
+            
+            public Node() {
+            }
+            
+            public Node(int weight, char element) {
+                this.weight = weight;
+                this.element = element;
+            }
+        }
+    }
+    
+    static class Heap<E extends Comparable<E>> implements Serializable {
+
+        private ArrayList<E> list = new ArrayList<E>();
+        
+        //Default Constructor
+        public Heap() {}
+
+        public Heap(E[] objects) {
+            for (int i = 0; i < objects.length; i++){
+                add(objects[i]);
+            }
+        }
+        public void add(E newObject){
+            list.add(newObject); 
+            int currentIndex = list.size() - 1; 
+
+            while (currentIndex > 0) {
+                int parentIndex = (currentIndex - 1) / 2;
+                if (list.get(currentIndex).compareTo(list.get(parentIndex)) > 0) {
+                    E temp = list.get(currentIndex);
+                    list.set(currentIndex, list.get(parentIndex));
+                    list.set(parentIndex, temp);
+                } else {
+                    break; 
+                }
+                currentIndex = parentIndex;
+            }
+        }
+
+        public E remove(){
+            if (list.size() == 0) {
+                return null;
+            }
+
+            E removedObject = list.get(0);
+            list.set(0, list.get(list.size() - 1));
+            list.remove(list.size() - 1);
+
+            int currentIndex = 0;
+            while (currentIndex < list.size()){
+                int leftChildIndex = 2 * currentIndex + 1;
+                int rightChildIndex = 2 * currentIndex + 2;
+
+                if (leftChildIndex >= list.size()){
+                    break; 
+                }
+                int maxIndex = leftChildIndex;
+                if(rightChildIndex < list.size()){
+                    if (list.get(maxIndex).compareTo(list.get(rightChildIndex)) < 0){
+                        maxIndex = rightChildIndex;
+                    }
+                }
+                if(list.get(currentIndex).compareTo(list.get(maxIndex)) < 0){
+                    E temp = list.get(maxIndex);
+                    list.set(maxIndex, list.get(currentIndex));
+                    list.set(currentIndex, temp);
+                    currentIndex = maxIndex;
+                } 
+                else{
+                    break; 
+                }
+            }
+
+            return removedObject;
+        }
+        public int getSize() {
+            return list.size();
         }
     }
 
     //from assignment 2
     public static class BitOutputStream {
         private FileOutputStream output;
-        private int placeholder = 0; 
+        private byte placeholder = 0; 
         private int numBits = 0; 
 
-        public BitOutputStream(File file) throws IOException {
-            output = new FileOutputStream(file);
+        public BitOutputStream(File file, boolean append) throws IOException {
+            output = new FileOutputStream(file, append);
         }
 
         public void writeBit(String bitString) throws IOException {
@@ -120,20 +224,16 @@ public class Compress {
         }
 
         public void writeBit(char bit) throws IOException {
-            if (bit == '0') {
-                placeholder <<= 1; 
-                numBits ++;
-            } else if (bit == '1') {
-                placeholder = (placeholder << 1) | 1;
-                numBits ++;
-            } else {
-                throw new IllegalArgumentException("Bit must be 0 or 1.");
-            } 
-            if(numBits == 8) {
+            placeholder <<= 1;
+
+            placeholder |= Character.getNumericValue(bit);
+            numBits++;
+
+            if (!(numBits == 0 || numBits == 8)) {
                 output.write(placeholder);
-                placeholder = 0;
-                numBits = 0;
+                placeholder <<= (8 - numBits);
             }
+
         }
         
         public void close() throws IOException {

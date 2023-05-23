@@ -14,7 +14,8 @@ public class compressFile {
             System.exit(2);
         }
         
-        DataInputStream sourceFileStream = new DataInputStream(new BufferedInputStream(new FileInputStream(sourceFile)));
+        DataInputStream sourceFileStream = new DataInputStream(new FileInputStream(sourceFile));
+        
         int size = sourceFileStream.available();
         byte[] temp = new byte[size];
         sourceFileStream.read(temp);
@@ -29,10 +30,10 @@ public class compressFile {
             result.append(codes[text.charAt(i)]);
         }
 
-        ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(args[1]));
-        output.writeObject(codes);
-        output.writeInt(result.length());
-        output.close();
+        ObjectOutputStream objectOutputStream = new ObjectOutputStream(new FileOutputStream(args[1]));
+        objectOutputStream.writeObject(codes);
+        objectOutputStream.writeInt(result.length());
+        objectOutputStream.close();
 
         BitOutputStream outputStream = new BitOutputStream(new File(args[1]));
         outputStream.writeBit(result.toString());
@@ -40,13 +41,13 @@ public class compressFile {
 
     }
     //From Assignment 2
-    public static class BitOutputStream {
-        private FileOutputStream output;
+    public static class BitOutputStream implements AutoCloseable {
+        private DataOutputStream output;
         private int placeholder = 0; 
         private int numBits = 0; 
 
-        public BitOutputStream(File file) throws IOException {
-            output = new FileOutputStream(file);
+        public BitOutputStream(File file) throws FileNotFoundException {
+            output = new DataOutputStream(new FileOutputStream(file, true));
         }
 
         public void writeBit(String bitString) throws IOException {
@@ -84,8 +85,8 @@ public class compressFile {
         if(root == null){
             return null;
         }
-        String[] codes = new String[2*128];
-        assignCode(root,codes);
+        String[] codes = new String[2 * 128];
+        assignCode(root, codes);
         return codes;
     }
     
@@ -129,7 +130,7 @@ public class compressFile {
         return counts;
     }
     
-    public static class Tree implements Comparable<Tree> {
+    public static class Tree implements Comparable<Tree>{
         Node root;
 
         public Tree(Tree t1, Tree t2) {
@@ -155,12 +156,12 @@ public class compressFile {
             }
         }
 
-        public class Node {
-            char element; 
-            int weight; 
-            Node left; 
-            Node right; 
-            String code = ""; 
+        public class Node implements Serializable {
+            char element; // Stores the character for a leaf node
+            int weight; // weight of the subtree rooted at this node
+            Node left;  // Reference to the left subtree
+            Node right;  // Reference to the right subtree
+            String code = ""; // The code of this node from the root
             
             public Node() {
             }
