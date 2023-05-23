@@ -1,8 +1,13 @@
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class Decompress {
@@ -12,36 +17,71 @@ public class Decompress {
             System.exit(1);
         }
 
-        File sourceFile = new File(args[0]);
-        FileOutputStream outputFile = new FileOutputStream(args[1]);
+        File checkFile = new File(args[0]);
 
-        if (!sourceFile.exists()) {
+        if (!checkFile.exists()) {
             System.out.println("Could not find compressed file");
             System.exit(2);
         }
-        
-        FileInputStream source = new FileInputStream(args[1]);
-        char[] result = decompresor(source);
 
-        source.close();
+        FileInputStream sourceFile = new FileInputStream(args[0]);
+        FileOutputStream outputFile = new FileOutputStream(args[1]);
+        
+        char[] result = decompresor(sourceFile, outputFile, args[0]);
+
+        sourceFile.close();
         outputFile.close();
     }
 
     private static char[] decompresor(
-        FileInputStream sourceFile
+        FileInputStream sourceFile, FileOutputStream outputFile, String sourceFilePath
         ) throws IOException, ClassNotFoundException {
-
-        ObjectInputStream objectInput = new ObjectInputStream(sourceFile);
-        Tree tree = (Tree) objectInput.readObject();
-
-        BitInputStream bitInput = new BitInputStream(sourceFile);
-        char[] result = tree.decode(bitInput);
-
-        bitInput.close();
-        System.out.println(result);
-
         
+        ObjectInputStream objectInput = new ObjectInputStream(new FileInputStream(sourceFilePath));
 
+        Tree hashTree = (Tree) objectInput.readObject();
+
+        // Find the size of the hashTree
+        int sizeOfData = sizeOf(hashTree);
+        objectInput.close();
+
+
+        sourceFile.skip(sizeOfData);
+
+        int toRead = sourceFile.available();
+
+        List<Byte> codes = new ArrayList<Byte>();
+        while (toRead > 0) {
+            byte byteToAdd = (byte) sourceFile.read();
+            codes.add(byteToAdd);
+            toRead--;
+        }
+        
+        // The binary source file is no longer needed so we can close it
+        sourceFile.close();
+
+        StringBuilder text = new StringBuilder();
+        for (byte b: codes) {
+            String byte1 = String.format("%8s", Integer.toBinaryString(b & 0xFF).replace(' ', '0'));
+            text.append(byte1);
+        }
+        PrintWriter pw = new PrintWriter(outputFile);
+
+        Tree.Node node = hashTree.root;
+        char[] bitsArray = text.toString().toCharArray();
+
+        for (int i = 0; i < bitsArray.length; i++) {
+            char bit = bitsArray[i];
+            int bitInt = Integer.parseInt(Character.toString(bit));
+            node = (bitInt == 0) ? node.left : node.right;
+
+            if (node.left == null && node.right == null) {
+                pw.write(node.element);
+                node = hashTree.root;
+            }
+        }
+
+        pw.close();
 
         return null;
         
@@ -73,28 +113,6 @@ public class Decompress {
             }
         }
 
-        public char[] decode(BitInputStream input) throws IOException {
-            StringBuilder result = new StringBuilder();
-            Node current = root;
-
-            while (input.available() > 0) {
-                boolean bit = input.readBit();
-                if (bit) {
-                    current = current.left;
-                } else {
-                    current = current.right;
-                }
-
-                if (current.left == null && current.right == null) {
-                    result.append(current.element);
-                    current = root;
-                }
-            }
-
-            return result.toString().toCharArray();
-
-        }
-
         public class Node {
             char element; 
             int weight; 
@@ -112,33 +130,15 @@ public class Decompress {
         }
     }
 
-    static class BitInputStream implements AutoCloseable{
-        private FileInputStream input;
-        private int bitPosition = 0;
-        private byte currentByte;
+    public static int sizeOf(Tree hashTree) throws IOException {
+        ByteArrayOutputStream byteOutput = new ByteArrayOutputStream();
+        ObjectOutputStream objectOutput = new ObjectOutputStream(byteOutput);
 
-        public BitInputStream(FileInputStream input) {
-            this.input = input;
-        }
+        objectOutput.writeObject(hashTree);
+        objectOutput.flush();
+        objectOutput.close();
 
-        public boolean readBit() throws IOException {
-            int offset = bitPosition++ % 8;
-
-            if (offset == 0) {
-                currentByte = (byte) input.read();
-            }
-
-            int mask = 1 << (7 - offset);
-            return (currentByte & mask) != 0;
-        }
-
-        public int available() throws IOException {
-            return (8 * input.available()) + (7 - (bitPosition % 8));
-        }
-
-        public void close() throws IOException {
-            input.close();
-        }
+        return byteOutput.toByteArray().length;
     }
 
 }
