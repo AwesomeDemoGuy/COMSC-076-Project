@@ -1,3 +1,8 @@
+/*
+ * May 16, 2023
+ * Part 1
+ * This program intends to compress a source file into a target file using the Huffman coding method.
+ */
 
 import java.io.*;
 import java.util.ArrayList;
